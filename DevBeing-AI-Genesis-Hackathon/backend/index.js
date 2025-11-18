@@ -2,6 +2,10 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import slackAuthRoutes from "./auth/slack.js";
+app.use("/auth", slackAuthRoutes);
+
+
 // ------------------- IMPORTS -------------------
 import express from "express";
 import cors from "cors";
