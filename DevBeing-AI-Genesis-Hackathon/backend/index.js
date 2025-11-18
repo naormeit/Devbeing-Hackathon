@@ -1,3 +1,7 @@
+app.get("/", (req, res) => {
+  res.send("Backend is running ✔");
+});
+
 // ------------------- ENV -------------------
 import dotenv from "dotenv";
 dotenv.config();
