@@ -1,53 +1,35 @@
 import express from "express";
-import axios from "axios";
-import querystring from "querystring";
+import fetch from "node-fetch";
 
 const router = express.Router();
 
-const clientId = process.env.SLACK_CLIENT_ID;
-const clientSecret = process.env.SLACK_CLIENT_SECRET;
-const redirectUrl = process.env.SLACK_REDIRECT_URL;
-
-// Step 1: Redirect user to Slack Login
-router.get("/slack", (req, res) => {
-  const url = `https://slack.com/oauth/v2/authorize?client_id=${clientId}&scope=identity.basic,identity.email,identity.avatar,identity.team&redirect_uri=${redirectUrl}`;
-  res.redirect(url);
+// Slack Login – Redirect user to Slack OAuth
+router.get("/slack/login", (req, res) => {
+  const redirectUrl = `https://slack.com/oauth/v2/authorize?client_id=${process.env.SLACK_CLIENT_ID}&scope=channels:history,chat:write,users:read&redirect_uri=${process.env.SLACK_REDIRECT_URI}`;
+  res.redirect(redirectUrl);
 });
 
-// Step 2: Slack redirects user back here with ?code=
+// Slack Callback – Exchange code for token
 router.get("/slack/callback", async (req, res) => {
   const code = req.query.code;
 
   try {
-    const response = await axios.post(
-      "https://slack.com/api/oauth.v2.access",
-      querystring.stringify({
+    const response = await fetch("https://slack.com/api/oauth.v2.access", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
         code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: redirectUrl,
+        client_id: process.env.SLACK_CLIENT_ID,
+        client_secret: process.env.SLACK_CLIENT_SECRET,
+        redirect_uri: process.env.SLACK_REDIRECT_URI,
       }),
-      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
-    );
+    });
 
-    const data = response.data;
-
-    if (!data.ok) {
-      return res.status(400).json({ error: data.error });
-    }
-
-    // Slack user information
-    const user = {
-      id: data.authed_user.id,
-      token: data.authed_user.access_token,
-      team: data.team.name,
-    };
-
-    // Redirect user back to your frontend with Slack auth success
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?slack=success`);
-  } catch (error) {
-    console.error("Slack OAuth Error:", error.message);
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?slack=failed`);
+    const data = await response.json();
+    res.json({ success: true, slackToken: data.access_token });
+  } catch (err) {
+    console.error("Slack OAuth Error:", err);
+    res.status(500).json({ success: false, message: "Slack OAuth failed" });
   }
 });
 
